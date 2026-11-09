@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }} - Py ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.11', '3.12']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Verify compilation and syntax
+        run: |
+          python -m compileall src
+
+      - name: Run test suite with pytest
+        run: |
+          pytest -v --durations=10
+
+      - name: Execute CLI smoke tests
+        run: |
+          python -m neuro_symphony.cli --help
+          python -m neuro_symphony.cli simulate-hh --duration 30.0 --dt 0.05
+          python -m neuro_symphony.cli bgtc-oscillations --duration 60.0 --dt 0.1
+          python -m neuro_symphony.cli dbs-control --duration 60.0 --dt 0.1
+          python -m neuro_symphony.cli demo --duration 50.0 --dt 0.1
+
+      - name: Execute standalone examples
+        run: |
+          python examples/parkinsonian_beta_suppression.py
+          python examples/closed_loop_vs_open_loop_dbs.py
